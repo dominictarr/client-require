@@ -22,7 +22,7 @@ exports ['discover dependencies a'] = function (test){
  
   depends('./examples/a',__dirname,function (err,a){
     it(err).equal(null)
-    it(a).has([
+    it(a.modules).has([
       { /*resolve: './examples/a'
       , */filename: __dirname + '/examples/a.js' }
     ])
@@ -38,11 +38,9 @@ exports ['discover dependencies b'] = function (test){
     
     //files will be returned in topological sort order.
     
-    it(a).has([
-      { /*resolve: './examples/a'
-      , */filename: __dirname + '/examples/a.js' }
-    , { /*resolve: './examples/a'
-      , */filename: __dirname + '/examples/b.js' }
+    it(a.modules).has([
+      { filename: __dirname + '/examples/a.js' }
+    , { filename: __dirname + '/examples/b.js' }
     ])
 
     test.done()
@@ -62,18 +60,59 @@ exports ['discover dependencies c'] = function (test){
     , c:__dirname + '/examples/c.js' 
     }
     
-    it(a).has([
+    it(a.modules).has([
       { resolves: {}
       , filename: files.a }
     , { resolves: {'./a': files.a}
       , filename: files.b }
-    , { resolves: {'./b': files.b}
+    , { resolves: {'./a': files.a, './b': files.b}
       , filename: files.c }
     ])
+
+    console.log(a)
 
     test.done()
   })
 }
+
+exports ['discover dependencies from path'] = function (test){
+
+  depends('bnr/test/examples/c',__dirname,function (err,c_path){
+    it(err).equal(null)
+    
+    //files will be returned in topological sort order.
+    
+    var files = {
+      a:__dirname + '/examples/a.js'
+    , b:__dirname + '/examples/b.js'
+    , c:__dirname + '/examples/c.js' 
+    }
+    
+    it(c_path.modules).has([
+      { resolves: {}
+      , filename: files.a }
+    , { resolves: {'./a': files.a}
+      , filename: files.b }
+    , { resolves: {'./a': files.a, './b': files.b}
+      , filename: files.c }
+    ])
+
+    console.log(c_path)
+
+    test.done()
+  })
+}
+
+
+exports ['error on module not found'] = function (test){
+
+  depends('bnr/test/dslfvnsdlkfds',__dirname,function (err){
+    it(err).property('message',it.matches(/Cannot find module/))
+       
+    test.done()
+  })
+}
+
 
 /*
 okay, so I want to generate a javascript with all the dependencies

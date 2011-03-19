@@ -1,5 +1,22 @@
 /*
+how does this load into the browser?
+
+wrapped inside a function ()?
+
+bnr('/pathto/main/module')
+
+... which returns exports... will be nice to test...
+
+so i'll need a header... which creates module and the require function.
+
+bnr(rel,path,function(err,src){
+  eval(src)
+  a = b_require('./a')
+
+})
+
 */
+
 var depends = require('bnr').depends
   , scripts = require('bnr').scripts
   , it = require('it-is')
@@ -9,52 +26,69 @@ var depends = require('bnr').depends
     , c:__dirname + '/examples/c.js' 
     }
 
-exports ['discover dependencies a'] = function (test){
-  scripts('./examples/a',__dirname)
+function isModule(name){
+  return function (actual){
+    it(actual).has({
+      filename: files[name]
+    , resolves: {}
+    , src: it.function()
+    })
+  }
+}
+
+exports ['load dependencies a'] = function (test){
   
   scripts('./examples/a',__dirname,function (err,a){
     it(err).equal(null)
-    it(a).has([
-      { /*resolve: './examples/a'
-      , */filename: __dirname + '/examples/a.js' }
-    ])
+    var modules = {}
+    modules[files.a] = isModule('a')
+
+    it(a).has({
+      main: files.a
+    , request: './examples/a'
+    , pwd: __dirname  
+    , modules: modules
+    })
+    
 
     test.done()
   })
 }
-/*
-exports ['discover dependencies b'] = function (test){
-
-  depends('./examples/b',__dirname,function (err,a){
+exports ['load dependencies b'] = function (test){
+  
+  scripts('./examples/b',__dirname,function (err,all){
     it(err).equal(null)
-    
-    //files will be returned in topological sort order.
-    
-    it(a).has([
-    ])
+    var modules = {}
+    modules[files.a] = isModule('a')
+    modules[files.b] = isModule('b')
 
+    it(all).has({
+      main: files.b
+    , request: './examples/b'
+    , pwd: __dirname  
+    , modules: modules
+    })
     test.done()
   })
+
 }
 
-exports ['discover dependencies c'] = function (test){
-
-  depends('./examples/c',__dirname,function (err,a){
+exports ['load dependencies c'] = function (test){
+  
+  scripts('./examples/c',__dirname,function (err,all){
     it(err).equal(null)
-    
-    //files will be returned in topological sort order.
-    
-    it(a).has([
-      { resolves: {}
-      , filename: files.a }
-    , { resolves: {'./a': files.a}
-      , filename: files.b }
-    , { resolves: {'./b': files.b}
-      , filename: files.c }
-    ])
+    var modules = {}
+    modules[files.a] = isModule('a')
+    modules[files.b] = isModule('b')
+    modules[files.c] = isModule('c')
 
+    it(all).has({
+      main: files.c
+    , request: './examples/c'
+    , pwd: __dirname  
+    , modules: modules
+    })
     test.done()
   })
 }
 
-//*/
