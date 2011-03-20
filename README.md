@@ -55,6 +55,16 @@ no, i could collect them after... because I know the file name.
 then, only add the necessary packages...
 it may help to translate the versions into something simpler?
 
+aha! what if I resolved the packages refured to in the package.json
+  ... so i know what they will be refuring to
+  , when the server loads them!
+
+add the following to resolves:
+   package : /path/to/npm/.npm/[package]/[version]/package/main.js
+   
+then check the resolve will work.
+  ...unless they don't declare thier dependencies.
+
 or, would i get more love by writing the fallback?
 
 would it be any easier for the server to resolve?
@@ -73,5 +83,6 @@ all modules should load syncroniously.
 hmm. what about a simple test runner where i load the test runner,
 then load the test, then write one extra line to tell the runner to load the test & execute it?
 
-sounds simple and useful. 
-and callback the 
+some compromises that make me think i'm only covering the 90% case.
+
+how big is the 90% case? what if I ran all the tests on npm and found out?
