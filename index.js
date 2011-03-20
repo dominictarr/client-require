@@ -25,14 +25,6 @@ function depends(request, relative, cb){
 
   exec(cmd,function (err,stdout,stderr){
     var obj = {}
-    /*console.log('*************************')
-    console.log(err)
-    console.log('*************************')
-    console.log(stdout)
-    console.log('*************************')
-    console.log(stderr)
-    console.log('*************************')
-    */
     try {obj = JSON.parse(stdout)} catch(err) {obj.error = err}
     cb(err || obj.error,obj.success)
   })
@@ -69,7 +61,15 @@ function renderScript (request,relative,cb){
 }
 var Module = module.constructor
 
-function Header (payload,req,rel){
+function registerModule(fn,closure,resolves){
+  __payload__[fn] = {
+    resolves: resolves
+  , closure: closure
+  }
+}
+function Header (req,rel){
+  var modules = __payload__
+
   /*
   some simple changes to make nodejs code feel more at home in the browser.
   */
@@ -97,26 +97,50 @@ function Header (payload,req,rel){
   }
   var cache = {}
  
-  function b_require (req,parent){
-
-    var fn
+  function relativeToFile (to,req){
+    to = to.split('/')
+    to.pop()//get rid of current file or empty '' (if last thing ends in file)
+    req = req.split('/')
+    while('.' === req[0][0]){
+      if('..' === req[0])
+        to.pop(); 
+      req.shift()
+    }
+    return to.join('/') + '/' + req.join('/')
+  }
+  function resolve (req,parent) {
     if(!parent) {
-      fn = payload.main
-    } else
-      fn = parent.resolves[req]
-  
+      return __manifest__.main
+    } else {
+      return __payload__[parent.filename].resolves[req] 
+        || '.' === req[0] 
+          ? relativeToFile(parent.filename,req + '.js')
+          : (function (){
+              var paths = __manifest__.paths
+              for( var m in paths){
+                var abs = paths[m] + '/' + req + '.js'
+                if(__payload__[abs])
+                  return abs
+              }
+          })()
+    }
+  }
+
+  function b_require (req,parent){
+    var fn = resolve(req,parent)
     if(cache[fn] && cache.hasOwnProperty(fn))
       return cache[fn].exports
 
-    if(!payload.modules[fn]){
+    if(!modules[fn]){
+    //this is where i should fall back to a blocking XHR.
       throw new Error('could not load:\'' + req +"' (" + fn + ") expected one of:" 
-        + JSON.stringify(Object.keys(payload.modules)) 
+        + JSON.stringify(Object.keys(modules)) 
         + '\nrequested by: ' 
         + JSON.stringify(parent))
     }
-    var func = payload.modules[fn].closure
+    var func = modules[fn].closure
     var m  = new Module(fn,parent)
-    m.resolves = payload.modules[fn].resolves
+    m.filename = fn
     var dir = fn.split('/')
     if(dir.length > 1)
       dir.pop()
@@ -129,28 +153,90 @@ function Header (payload,req,rel){
   return b_require
 }
 
+function nice (obj){
+
+  return render(obj,{
+      joiner:",\n  "
+    , indent: '  '
+    , padJoin: ['\n  ','\n']
+    , surround: function (value,p,def){
+        if('function' !== typeof p.value)
+          return def(value,p)
+        return p.value.toString()
+      }  
+    })
+
+}
+/*
+function nice_property (obj,payload,property,add1, add2){
+  return Object.keys(obj).map(function (filename){
+    return payload
+      + '[' 
+      + JSON.stringify(filename)
+      + ']' +  add1 +
+    nice(obj[filename][property])
+      + add2
+  }).join('\n')
+}*/
+/*
+hmm. generating javascript is a bit ugly.
+
+other possible ways:
+
+__registerModule(filename,code,resolves)
+
+ways to load the javascript...
+
+generate each module  into a seperate .js file
+and add script tags (be handy for dev)
+then stick that list in the template.
+
+or...
+set script to a request... this is proably next:
+
+create service which loads request....
+
+oh yeah! support loading any main module.
+how am I gonna do that?
+
+if a module loads something async, it may already exit.
+
+*/
 function bnr (request, relative, cb) {
-
   renderScript(request, relative,function (err,load){
+    var payloader = '__payload__'
+    var payload = 
+    Object.keys(load.modules).map(function (key){
+      return 'registerModule(' + [
+        key,load.modules[key].closure,load.modules[key].resolves
+      ].map(nice).join(',\n') + ')\n'
+    }).join('\n')
 
-    var str = 
-    render(load,{
-        joiner:",\n  "
-      , indent: '  '
-      , padJoin: ['\n  ','\n']
-      , surround: function (value,p,def){
-
-          if('function' !== typeof p.value)
-            return def(value,p)
-            
-          return p.value.toString()
-        }  
-      })
-    
+/*    var payload_closures = 
+          nice_property(
+              load.modules
+            , payloader
+            , 'closure'
+            , '.closure = '
+            , '')
+    var payload_resolves = 
+          nice_property(
+              load.modules
+            , payloader
+            , 'resolves'
+            , ' = {resolves:'
+            , '}')*/
+    delete load.modules
+    var manifest = nice(load)
     cb(err, [
-        module.constructor.toString()
+        'var __payload__ = {}, __manifest__;'
+      , module.constructor.toString()
+      , registerModule.toString()
       , Header.toString()
-      , 'b_require = Header(' + str + ');'].join('\n')
+      , '__manifest__ = ' + manifest 
+      , payload
+      , 'b_require = Header();'].join('\n')
     )
   })
 }
+

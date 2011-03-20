@@ -1,4 +1,4 @@
-/*node,/home/dominic/dev/bnr/hello.js,render/test/render.expresso*/
+/*node,/home/dominic/dev/bnr/hello.js,render/test/render.newlines.expresso*/
 function Module(id, parent) {
   this.id = id;
   this.exports = {};
@@ -2254,67 +2254,144 @@ b_require = Header({
         './styles': "/home/dominic/npm/.npm/it-is/0.0.1/package/styles.js"
       }
     },
-    '/home/dominic/npm/.npm/render/0.0.2/package/test/render.expresso.js': {
+    '/home/dominic/npm/.npm/render/0.0.2/package/test/render.newlines.expresso.js': {
       closure: function (require,module,exports,__filename,__dirname){
-        var it = require('it-is')
-          , render = require('../render')
+        //render.multiline.expresso.js
+        /*
+        what are all the different styles for rendering js?
+        
+        //inline:
+        { key1: value, key2: value, child: {key: value} }
+        
+        new lines:
+        
+        { key1: value
+        , key2: value
+        , child: 
+          { key1: value
+          , key2: value } }
+        
+        comma after
+        
+        { key1: value,
+          key2: value,
+          child: { key1: value,
+            key2: value, } }
           
-        exports ['renders an object'] = function (test){
-          var a,b,c
-          c = []
-          c.push(c)
-          var examples =
-          [ [ [1,2,3,4], '[ 1, 2, 3, 4 ]']
-          , [ {}, /^{}$/]
-          , [ {a:'b'}, '{ a: "b" }']
-          , [ d = new Date, d.toString()]
-          , [ /xyz/, '/xyz/']
-          , [ null, 'null']
-          , [ undefined, 'undefined']
-          , [ c, 'var0=[ var0 ]']
-          , [ function a (x,y,z){}, 'function a(x,y,z){}']
-          , [ function (){'blah blah blah'}, 'function (){...}']
-          , [ {X: function (){'blah blah blah'
-                  return } }, '{ X: function (){...} }']
-          ]
+        multi line if properties:
         
-        //thats a basics. multilines and indentation.
+        { key1: value,
+          key2: value,
+          child: 
+            { key1: value,
+              key2: value } }
         
-          it(examples).every(function (e){
-            if('string' == typeof e[1])
-              it(render(e[0])).equal(e[1])
-            else
-              it(render(e[0])).matches(e[1])
-          })
+        or
+        
+        { key1: value,
+          key2: value,
+          child: {
+            key1: value,
+            key2: value } }
+        
+        bracketts on it's own line or not:
+        
+        {
+          key1: value,
+          key2: value,
+          child: {
+            key1: value,
+            key2: value 
+          }
         }
         
-        exports ['multiline and indentation'] = function (test) {
-           var a,b,c
-          c = []
-          c.push(c)
         
-          var examples =
-          [ [ [1,2,3,4], "[ 1\n, 2\n, 3\n, 4 ]"]
-          , [ [1,2,[3,4]], "[ 1\n, 2\n, [ 3\n  , 4 ] ]"]
-          , [ [1,2,[[[]]],[3,4]], "[ 1\n, 2\n, [ [ [] ] ]\n, [ 3\n  , 4 ] ]"]
-          , [ [1,2,{x:'asdfasfasf',y:{K:21434}},[3,4]]
-            , "[ 1\n, 2\n, { x: \"asdfasfasf\"\n  , y: { K: 21434 } }\n, [ 3\n  , 4 ] ]" ]
-          , [ {}, '{}']
-        /*  , [ [1,2,"hello\nthere",4] 
-            , "[ 1\n, 2\n, \"hello\n   there\"\n, 4 ]" ]*/
-          , [ {a:'b'}, '{ a: "b" }']
-          , [ c, 'var0=[ var0 ]']
-          , [ function a (x,y,z){}, 'function a(x,y,z){}']
-          , [ function (){'blah blah blah'}, 'function (){...}']
-          ]
+        opening on it's own line
+        closing on it's own line
+        comma end or next
+        */
         
-        //thats a basics. multilines and indentation.
+        var it, is = it = require('it-is')
+          , render = require('../render')
         
-          it(examples).every(function (e){
-            var r = render(e[0],{multi:true})
-            console.log(r)
-            it(r).equal(e[1])
-          })
+        function para(){
+          var s = []
+          for(var i in arguments)
+            s.push(arguments[i])
+            
+          return s.join('\n')
+        }
+        
+        var renderme = 
+            { key1: 1
+            , key2: 2
+            , child: 
+              { key1: 3
+              , key2: 4 } }
+        
+        exports ['test render in different styles'] = function (){
+          
+          //indented with comma first
+          
+          it(render(renderme,{joiner:"\n, ", indent: '  '}))
+            .equal(
+              para
+              ( '{ key1: 1'
+              , ', key2: 2'
+              , ', child: { key1: 3'
+              , '  , key2: 4 } }' ) )
+        
+          //indented, comma-first, start-newline
+        
+          it(render(renderme,{joiner:"\n, ", indent: '  ', padMulti: ['\n','']}))
+            .equal(
+              para
+              ( '{ key1: 1'
+              , ', key2: 2'
+              , ', child: '
+              , '  { key1: 3'
+              , '  , key2: 4 } }' ) )
+        
+          //indented, comma-first, bracket-ownline, cl-bracket-trailing
+        
+          it(render(renderme,{joiner:"\n, ", indent: '  ', padJoin: ['\n  ',' ']}))
+            .equal(
+              para
+              ( '{'
+              , '  key1: 1'
+              , ', key2: 2'
+              , ', child: {'
+              , '    key1: 3'
+              , '  , key2: 4 } }' ) )
+        
+          //indented, comma-first, bracket-newline, cl-bracket-newline
+        
+          it(render(renderme,{joiner:"\n, ", indent: '  ', padJoin: ['\n  ','\n']}))
+            .equal(
+              para
+              ( '{'
+              , '  key1: 1'
+              , ', key2: 2'
+              , ', child: {'
+              , '    key1: 3'
+              , '  , key2: 4'
+              , '  }'
+              , '}' ) )
+        
+          //indented, comma-trailing, bracket-newline, cl-bracket-newline
+        
+          it(render(renderme,{joiner:",\n  ", indent: '  ', padJoin: ['\n  ','\n']}))
+            .equal(
+              para
+              ( '{'
+              , '  key1: 1,'
+              , '  key2: 2,'
+              , '  child: {'
+              , '    key1: 3,'
+              , '    key2: 4'
+              , '  }'
+              , '}' ) )
+        
         }
       },
       resolves: {
@@ -2323,8 +2400,8 @@ b_require = Header({
       }
     }
   },
-  main: "/home/dominic/npm/.npm/render/0.0.2/package/test/render.expresso.js",
-  request: "render/test/render.expresso",
+  main: "/home/dominic/npm/.npm/render/0.0.2/package/test/render.newlines.expresso.js",
+  request: "render/test/render.newlines.expresso",
   paths: [
     "/home/dominic/npm",
     "/home/dominic/dev",
