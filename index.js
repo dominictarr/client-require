@@ -10,7 +10,7 @@ var exec = require('child_process').exec
   , render = require('render')
 
 function indent(str){
-  return ('' + str).split('\n').map(function (e){return '  ' + e}).join('\n')
+  return ('' + str).trim().split('\n').map(function (e){return '  ' + e}).join('\n')
 }
 
 function depends(request, relative, cb){
@@ -25,19 +25,23 @@ function depends(request, relative, cb){
 
   exec(cmd,function (err,stdout,stderr){
     var obj = {}
+    /*console.log('*************************')
+    console.log(err)
+    console.log('*************************')
+    console.log(stdout)
+    console.log('*************************')
+    console.log(stderr)
+    console.log('*************************')
+    */
     try {obj = JSON.parse(stdout)} catch(err) {obj.error = err}
-    console.log(err,stdout)
     cb(err || obj.error,obj.success)
   })
 }
 
-function wrap(filename,done){
-
-  fs.readFile(filename,function (err,code){
-    done(err,eval('(function (require,module,exports,__filename,__dirname){\n'
-       + indent(code)
-       + "\n});"))
-  })
+function wrap(code,done){
+  return eval('(function (require,module,exports,__filename,__dirname){\n'
+     + indent(code)
+     + "\n});")
 }
 
 
@@ -45,64 +49,81 @@ function renderScript (request,relative,cb){
   var g = ctrl.group()
   
   depends(request,relative,function (err,deps){
-    
+
+    if(err)
+      return cb(err)    
+    var payload = {}
     deps.modules.forEach(function (e){
-      wrap(e.filename,g())
+
+      payload[e.filename] = {
+        closure: wrap(e.source)
+      , resolves: e.resolves
+      } 
     })
-    
-    g.done(function (err,funx){
-      var payload = {}
-        , err = null
-      deps.modules.forEach(function(e,key){
-        e.src = funx[key][1]
-        payload[e.filename] = e
-      })
-      
-/*      if (request[0] != '.')
-        throw new Error('path requests not supported')
-  */    
       deps.modules = payload
       deps.request = request
       deps.pwd = relative
       
-      cb(err,deps)/*{
-          request: request
-        , main: deps.main //join(relative,request + '.js')
-        , paths: require.paths
-        , pwd: relative
-        , modules: payload
-      })*/
-    })
-
+      cb(err,deps)
   })
 }
 var Module = module.constructor
 
 function Header (payload,req,rel){
-  function b_require (req,parent){
-    var fn
+  /*
+  some simple changes to make nodejs code feel more at home in the browser.
+  */
+  if(!this.process)
+    this.process = {
+      EventEmitter: function EventEmitter(){}
+    , nextTick: function (f){return setTimeout(f,0)}
+    , title: 'browser'
+    , versions: {}
+    }
+  if(!this.Buffer){
+    this.Buffer = Buffer
     
+    function Buffer(){}
+     
+    Buffer.isBuffer = function (){return false}    
+  }
+  if(this.navigator){
+    this.navigator.userAgent
+      .split(/\s+\(.*?\)\s+|\s/)
+      .forEach(function (e){ 
+        var v =/(\w+)\/([\d|.]+)/(e)
+        process.versions[v[1]] = v[2]
+      })
+  }
+  var cache = {}
+ 
+  function b_require (req,parent){
+
+    var fn
     if(!parent) {
       fn = payload.main
-    } else //if(req[0] == '.')
+    } else
       fn = parent.resolves[req]
+  
+    if(cache[fn] && cache.hasOwnProperty(fn))
+      return cache[fn].exports
 
-    console.log(fn)
-    
-/*    else {
-      var i = 0
-      while(!(fn = payload.modules[payload.paths[i] + '/' + req])){
-        i ++
-      }
-    }*/
-    var func = payload.modules[fn].src
+    if(!payload.modules[fn]){
+      throw new Error('could not load:\'' + req +"' (" + fn + ") expected one of:" 
+        + JSON.stringify(Object.keys(payload.modules)) 
+        + '\nrequested by: ' 
+        + JSON.stringify(parent))
+    }
+    var func = payload.modules[fn].closure
     var m  = new Module(fn,parent)
     m.resolves = payload.modules[fn].resolves
     var dir = fn.split('/')
-    dir.pop()
+    if(dir.length > 1)
+      dir.pop()
     func(function (req){
         return b_require(req,m)
       }, m, m.exports, fn, dir.join('/'))
+    cache[fn] = m
     return m.exports
   }
   return b_require
@@ -126,7 +147,7 @@ function bnr (request, relative, cb) {
         }  
       })
     
-    cb(err, [ 
+    cb(err, [
         module.constructor.toString()
       , Header.toString()
       , 'b_require = Header(' + str + ');'].join('\n')

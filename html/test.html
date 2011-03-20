@@ -1,0 +1,37 @@
+<head>
+<script src=./client.js>
+</script>
+<script>
+var test = b_require('traverser/test/iterator.synct')
+
+window.onload = function (){
+
+  var body = document.getElementsByTagName('body')[0]
+    , results = 
+  Object.keys(test).map(function (name){
+    try{
+      test[name]()
+      return {name: name, pass: true}
+    } catch (error){
+      console.log('fail: \'' + name + '\' --- ' + error)
+      error.stack = error.stack 
+      return {name: name, fail: error}
+    }
+      console.log('pass ' + name)
+    return {name: 'pass'}
+  })
+  console.log(results)
+  body.innerHTML = results.map(function (e){
+    if(e.pass)
+      return '<h5> pass: ' + e.name + '</h5>'
+    else
+      return '<h5> fail: ' + e.name + '</h5>'
+      
+  }).join('\n')
+}
+</script>
+</head>
+<body>
+hello
+</body>
+

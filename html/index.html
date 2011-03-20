@@ -1,6 +1,24 @@
 <head>
-<script src=./abc.js>
-b_require('./c')
+<script src=./assert.js>
+</script>
+<script>
+  this.errors = []
+  function go(){
+    var assert = b_require('assert')
+
+    document.onerror = window.onerror = function (err){
+      errors.push(err)
+      console.log('an error occured:' + err)
+      return false
+    }
+
+    assert.ok(false)
+  }
+
+  window.onload = function (){
+    alert('!')
+  }
+
 </script>
 </head>
 <body>

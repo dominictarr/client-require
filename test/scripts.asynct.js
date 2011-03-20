@@ -29,9 +29,8 @@ var depends = require('bnr').depends
 function isModule(name){
   return function (actual){
     it(actual).has({
-      filename: files[name]
-    , resolves: {}
-    , src: it.function()
+      resolves: {}
+    , closure: it.function()
     })
   }
 }

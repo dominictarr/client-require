@@ -1,3 +1,4 @@
+/*node,/home/dominic/dev/bnr/hello.js,it-is/test/assert.expresso*/
 function Module(id, parent) {
   this.id = id;
   this.exports = {};
@@ -9,33 +10,49 @@ function Module(id, parent) {
   this.children = [];
 }
 function Header(payload,req,rel){
-  if(!this.process)
-    this.process = {
+  /*
+  some simple changes to make nodejs code feel more at home in the browser.
+  */
+  if(!global.process)
+    global.process = {
       EventEmitter: function EventEmitter(){}
     , nextTick: function (f){return setTimeout(f,0)}
     , title: 'browser'
     , versions: {}
     }
-    if(navigator)
-      navigator.userAgent
-        .split(/\s+\(.*?\)\s+|\s/)
-        .forEach(function (e){ 
-          var v =/(\w+)\/([\d|.]+)/(e)
-          process.versions[v[1]] = v[2]//(e)})
-        })
+  if(!global.Buffer){
+    global.Buffer = Buffer
+    
+    function Buffer(){}
+     
+    Buffer.isBuffer = function (){return false}    
+  }
+  if(global.navigator){
+    navigator.userAgent
+      .split(/\s+\(.*?\)\s+|\s/)
+      .forEach(function (e){ 
+        var v =/(\w+)\/([\d|.]+)/(e)
+        process.versions[v[1]] = v[2]
+      })
+  }
+  var cache = {}
+ 
   function b_require (req,parent){
 
     var fn
     if(!parent) {
       fn = payload.main
-    } else //if(req[0] == '.')
+    } else
       fn = parent.resolves[req]
-
-//    console.log('parent', parent)
-//    console.log('filename', fn)
+  
+    if(cache[fn] && cache.hasOwnProperty(fn))
+      return cache[fn].exports
 
     if(!payload.modules[fn]){
-      throw new Error('could not load:\'' + fn +"' expected one of:" + JSON.stringify(Object.keys(payload.modules)))
+      throw new Error('could not load:\'' + req +"' (" + fn + ") expected one of:" 
+        + JSON.stringify(Object.keys(payload.modules)) 
+        + '\nrequested by: ' 
+        + JSON.stringify(parent))
     }
     var func = payload.modules[fn].closure
     var m  = new Module(fn,parent)
@@ -46,6 +63,7 @@ function Header(payload,req,rel){
     func(function (req){
         return b_require(req,m)
       }, m, m.exports, fn, dir.join('/'))
+    cache[fn] = m
     return m.exports
   }
   return b_require
@@ -941,10 +959,970 @@ b_require = Header({
       resolves: {
         util: "/home/dominic/dev/core/util.js"
       }
+    },
+    '/home/dominic/npm/.npm/curry/0.0.1/package/curry.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        module.exports = curry
+        
+        function curry (){
+          var left, right, func, self
+        
+          for(key in arguments){
+            var value = arguments[key]
+            
+            if(!right && Array.isArray(value))
+              if (!func) 
+                left = value
+              else
+                right = value
+            else if (!func && typeof value === 'function')
+              func = value
+            else 
+              self = value
+          }
+          return function (){
+           return func.apply(self,append([].concat(left || []),arguments).concat(right || [])) 
+          }
+        }
+        function append (a,args){
+          for (i in args) 
+            a.push(args[i])
+          return a 
+        }
+            /*
+            call styles:
+            
+            curry([left],fn,[right])
+            curry(fn,[right])
+            curry([left],fn)
+            curry(fn)
+        
+            calling styles:
+            curry([left],fn,[right],self)
+            curry(fn,[right],self)
+            curry([left],fn,self)
+            curry(fn,self)
+            */
+      },
+      resolves: {}
+    },
+    '/home/dominic/npm/.npm/traverser/0.0.1/package/iterators.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        //iterators
+        //var log = require('logger')
+        
+        /*
+        ~~~~~~~~~~~~~~~~~~~~~~~~
+        Sync
+        
+        
+        */
+        /*
+          i've discovered that js has some querks about properties being iteratred on
+          for example: for (i in obj) will include prototype properties,
+                  but Object.keys(obj) will not.
+                  
+                  for greatest flex, pass in a custom function to gen prop list.
+        
+                  when you are say, comparing objects, the correctness of iteration is essential.
+        */
+        
+        exports.sync = {
+          each: function (object,func){
+            for( key in object){
+              var value = object[key]
+              func(value,key,object)
+            }
+          },
+          find: function (object,func){
+            for( key in object){
+              var value = object[key]
+              var r = func(value,key,object)
+              if(r){
+                return value
+             }
+            }
+          },
+          map: function (object,func){
+            var m = []
+            for( key in object){
+              var value = object[key]
+              m.push(func(value,key,object))
+            }
+            return m
+          },
+          copy: function (object,func){
+            if('object' !== typeof object || object === null)
+              return object
+            var m = (object instanceof Array ? [] : {})
+            for( key in object){
+              var value = object[key]
+              m[key] = func(value,key,object)
+            }
+            return m
+          },
+          max: function (object,func){
+            var max = null
+            for( key in object){
+              var value = object[key]
+                , r = func(value,key,object)
+                if(r > max || max === null)
+                  max = r
+            }
+            return max
+          },
+          min: function (object,func){
+            var min = null
+            for( key in object){
+              var value = object[key]
+                , r = func(value,key,object)
+                if(r < min || min === null)
+                  min = r
+            }
+            return min
+          }
+        }
+        /*
+        ~~~~~~~~~~~~~~~~~~~~~~~~
+        Async
+        
+        
+        */
+        // keys function consistant with for
+        function keysFor(obj){
+          a = []
+          for(i in obj)
+            a.push(i)
+          return a
+        }
+        
+        var curry = require('curry')
+        
+        function async(object,func,collect,done){
+          var keys = keysFor(object)
+            , i = 0
+            item()
+            function next(r){
+              if(collect){//call collect(r,key,value,object,done)
+                var stop = collect(r,keys[i],object[keys[i]],object)
+                if(stop) return done(stop)
+              } 
+              i ++ 
+              if(i < keys.length)
+                process.nextTick(item)
+              else 
+                done()
+            }
+            function item(){
+            //func(value,key,next,object)
+              func(object[keys[i]],keys[i],next,object)
+            }
+        }
+        
+        exports.async = {
+          each: function (object,func,done){
+            async(object,func,null,done)
+          },
+          find: function (object,func,done){
+          
+            async(object,func,collect,done)
+            function collect(r,k,v){
+              if(r)
+                return v
+            }
+        
+          },
+          map: function (object,func,done){
+            var map = []
+            async(object,func,collect,curry([map],done))//curry creates a closure around map
+            function collect(r,k,v){
+            //  log('map',map,'push(',r,')')
+              map.push(r)
+            }
+          },
+          copy: function (object,func,done){
+            var map = (object instanceof Array ? [] : {})
+            async(object,func,collect,curry([map],done))
+            function collect(r,k,v){
+              map[k] = (r)
+            }
+          },
+          max: function (object,func,done){
+            var max 
+            async(object,func,collect,fin)
+            function collect(r,k,v){
+              if(r > max || max == null)
+                max = r
+            }
+            function fin (){
+              done(max)
+            }
+          },
+          min: function (object,func,done){
+            var min
+            async(object,func,collect,fin)
+            function collect(r,k,v){
+              if(r < min || min == null)
+                min = r
+            }
+            function fin (){
+              done(min)
+            }
+          },
+        
+        }
+      },
+      resolves: {
+        curry: "/home/dominic/npm/.npm/curry/0.0.1/package/curry.js"
+      }
+    },
+    '/home/dominic/npm/.npm/traverser/0.0.1/package/traverser.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        //traverser2
+        var curry = require('curry')
+          , sync = require('./iterators').sync
+          , async = require('./iterators').async
+        
+        module.exports = traverse
+        module.exports.sync = sync
+        module.exports.async = async
+        
+        exports.isObject = isObject
+        exports.isComplex = isComplex
+        
+        function isObject (props){
+          return ('object' === typeof props.value)
+        }
+        
+        var complex =
+          { 'function': true
+          , 'object': true
+          , 'string': false
+          , 'boolean': false
+          , 'number': false
+          , 'undefined': false
+        }
+        function isComplex (props){
+          return complex[typeof props.value]
+        }
+        function defaultLeaf(p){
+          return p.value
+        }
+        function defaultBranch (p){
+          return p.iterate()
+        }
+        function defaultLeafAsync(p,next){
+          next(p.value)
+        }
+        function defaultBranchAsync (p,next){
+          //log('DEFAULT BRANCH ASYNC')
+          p.iterate(next)
+        }
+        
+        function traverse (object,opts,done){
+        
+          if('function' == typeof opts)
+            opts = { each: opts
+                   , done: done }
+        
+          opts.async = !!(opts.done)//async mode if done is defined.
+        
+          if (opts.each)
+            opts.leaf = opts.branch = opts.each
+          if(!opts.leaf)
+            opts.leaf = opts.async ? defaultLeafAsync : defaultLeaf
+          if(!opts.branch)
+            opts.branch = opts.async ? defaultBranchAsync : defaultBranch
+        
+          if(!opts.isBranch)
+            opts.isBranch = exports.isObject
+        
+          var cont = opts.done ? async : sync
+        
+          if(!opts.iterator)
+            opts.iterator = 'map'
+        
+          if('string' == typeof opts.iterator){
+            var s = opts.iterator
+            opts.iterator = cont[s]
+            
+            if (!opts.iterator)
+              throw new Error('\'' + s + '\' is not the name of a traverse iterator.'
+                + ' try one of [' + Object.keys(cont) + ']')
+            }
+        
+          var props = 
+                { parent: null
+                , key: null
+                , value: object
+                , before: true
+                , circular: false
+                , reference: false
+                , path: [] 
+                , seen: []
+                , ancestors: []
+                , iterate: curry([opts.iterator],iterate)
+                }
+        
+          //setup iterator functions -- DIFFERENT IF ASYNC
+          Object.keys(cont).forEach(function(key){
+            var func = cont[key]
+            props[key] = curry([func],iterate)
+          })
+        
+          if(opts.pre){
+            props.referenced = false
+            var refs = []
+            traverse(object, {branch: check})
+            
+            function check(p){
+              if(p.reference)
+                refs.push(p.value)
+              else
+                p.each()
+            }
+        
+            props.repeated = refs
+          }
+                
+          function iterate(iterator,done){
+            var _parent = props.parent
+              , _key = props.key
+              , _value = props.value
+              , _index = props.index
+              , _referenced = props.referenced
+              , r
+            //log('DONE()',done)
+            props.ancestors.push(props.value)
+            props.parent = props.value
+            props.next = c
+            r = iterator(props.value,makeCall,c)
+            //seperate this function for async
+            if(!opts.async) return c(r)
+            function c(r){
+              //log('teardown branch ',r)
+              
+              props.key = _key
+              props.value = _value
+              props.parent = _parent
+              props.index = _index
+              if(opts.pre)
+                props.referenced = _referenced
+        
+              props.ancestors.pop()
+              if(opts.async) done(r)
+              return r //returned will be ignored if async
+            }
+          }
+        
+          function makeCall(value,key,next){//next func here if async.
+            var r, index
+            //using immutable objects would simplify this greatly, 
+            //because I could not have to teardown...
+            //maybe. would have to not depend on closures.
+            if(key !== null)
+              props.path.push(key)
+            props.key = key
+            props.value = value
+            if(opts.async)
+              props.next = c
+        
+            if(opts.isBranch(props)){
+              index = 
+                { seen: props.seen.indexOf(props.value)
+                , ancestors: props.ancestors.indexOf(props.value) }
+                
+                if(opts.pre){
+                  index.repeated = props.repeated.indexOf(props.value)
+                  props.referenced = (-1 !== index.repeated)
+                }
+        
+              props.index = index
+            
+              props.circular = (-1 !== index.ancestors)
+              ;(props.reference = (-1 !== index.seen)) 
+                || props.seen.push(value)
+        
+              r = opts.branch(props,c)
+            } else {
+              r = opts.leaf(props,c)
+            }
+            
+            if(!opts.async) return c(r) //finish up, if sync
+            function c (r){
+              if(key !== null)
+                props.path.pop()
+              if(opts.async) next(r)
+              return r
+            }
+          }
+          
+         return makeCall(object,null,opts.done)
+        }
+      },
+      resolves: {
+        curry: "/home/dominic/npm/.npm/curry/0.0.1/package/curry.js",
+        './iterators': "/home/dominic/npm/.npm/traverser/0.0.1/package/iterators.js"
+      }
+    },
+    '/home/dominic/npm/.npm/traverser/0.0.1/package/index.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        var e = module.exports = require('./traverser')
+      },
+      resolves: {
+        './traverser': "/home/dominic/npm/.npm/traverser/0.0.1/package/traverser.js"
+      }
+    },
+    '/home/dominic/npm/.npm/render/0.0.2/package/render.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        //render2.js
+        //a better renderer using traverser
+        
+        var traverser = require('traverser')
+        //  , inspect = require('sys').inspect
+        exports = module.exports = render
+        
+        exports.Special = Special
+        
+        function Special (string){
+          if(!(this instanceof Special)) return new Special(string)
+          this.toString = function(){return string}
+        }
+        
+        var defaults = {
+          indent: ''
+        , pad: ''
+        , padKey: ' '
+        , padSingle: ['', '']
+        , padJoin: [' ', ' ']
+        , padMulti: ['', '']
+        , padRoot: ['', '']
+        , joiner: ', '
+        , padJoinCompact: [' ', ' ']
+        , joinerCompact: ', '
+        , indentCompact: ''
+        , compactLength: false
+        , isCompact: function (object,p){
+            if(!this.compactLength)
+              return false
+            var length = 0
+            for(var i in object){
+              if(object[i] && ('object' == typeof object[i] || 'function' == typeof object[i]))
+                length += object[i].length || 5
+              else
+                length += ('' + object[i]).length + 2
+            }
+            return (length < this.compactLength)
+          }
+        , string: function (string,p){
+            return JSON.stringify(string)
+          }
+        , value: function (value,p){
+            if(p.value === undefined)
+              return 'undefined'
+            if('string' === typeof value){
+              if(!this.string)
+                require('logger')("!this.string", this)
+        
+              return this.string(value,p,function (z,x,c){return this.__proto__.string(z,x,c)})
+            }
+        //      return "\"" + value.split('\n').join('\n ') + "\""
+        
+            return JSON.stringify(value)
+          }
+        , key: function (key, p){
+            return p.parent instanceof Array ? '' : (/^\w+$/(key) ? key : "'" + key + "'") + ":" + this.padKey
+          }
+        , join: function (lines,p,def){
+            var self = this
+              , pad = lines.length ? self.pad : ''
+              , joiner = this.joiner
+              , padJoin = this.padJoin
+              , indentation = this.indent
+        
+            if(!lines.length)
+              return ''
+            if(this.isCompact(lines,p)){
+              joiner = this.joinerCompact
+              padJoin = this.padJoinCompact
+              indentation = this.indentCompact
+            }
+              
+        
+            return ( padJoin[0] + 
+                      lines.map 
+                      ( function (e) {return indent(e, indentation)} ).join (joiner)
+                    + padJoin[1])
+          }
+        , reference: function (rendered,p){
+          return 'var' + p.index.repeated
+        }
+        , referenced: function (index,p){
+           return 'var' + index + '='
+        }
+        , surround: function (objString,p){
+            if(p.value instanceof Date || p.value instanceof RegExp || p.value instanceof Special)
+              return p.value.toString()
+            if(p.value instanceof Array)
+              return '[' + objString + ']'
+            if(p.value === null)
+              return 'null'
+            if('function' == typeof p.value)
+              return  p.value.toString().replace(/{(\n|.)+}$/,'{...}')
+            return '{' + objString + '}'
+          }
+        , multiline: function (objString,p){
+          if(p.parent)
+            return this.padMulti[0] + objString + this.padMulti[1]
+          return this.padRoot[0] + objString + this.padRoot[1]
+        }
+        }
+        function render (obj, options){
+          options = options || {}
+          if(options.multi){
+            options.indent = '  '
+            options.joiner = '\n, '
+        /*    options.padSingle = ['','']
+            options.padJoin = [' ',' ']*/
+          }
+        
+            options.__proto__ = defaults
+          return traverser(obj, {branch: branch, leaf: leaf, isBranch:isBranch, pre:true})
+          
+          function isBranch(p){
+            return ('function' == typeof p.value || 'object' == typeof p.value)
+          }
+          function branch (p){
+            var key = (p.parent ? call('key',p.key,p) : '')    
+          
+            if(p.reference){
+             var r = call('reference',p.index.seen,p)
+              if(r !== undefined) return key + r
+            }
+            var object = call('surround',call('join',p.map(),p),p)
+              if(object && -1 !== object.indexOf('\n') )
+                object = call('multiline',object,p)
+        
+            return key + (p.referenced ? call('referenced',p.index.repeated,p) : '') + object
+          }
+          function leaf (p){
+            return (p.parent ? call('key',p.key,p) : '') + options.padSingle[0] + call('value',p.value,p) + options.padSingle[1]
+          }
+          function call(method,value,p){
+            return options[method](value,p,function (x,y,z){return options.__proto__[method](x,y,z)})
+          }
+        }
+        
+        function indent (s, ch){
+            return s.split('\n').join('\n' + ch)
+        }
+      },
+      resolves: {
+        traverser: "/home/dominic/npm/.npm/traverser/0.0.1/package/index.js"
+      }
+    },
+    '/home/dominic/npm/.npm/it-is/0.0.1/package/assert.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        //asserters
+        
+        var assert = require('assert')
+          , traverser = require('traverser')
+          , render = require('render')
+        
+        exports = module.exports = {
+          typeof: function (actual,expected,message){
+            if(expected !== typeof actual)
+              assert.fail(actual, expected, (actual + ' typeof ' + expected),'typeof',arguments.callee)
+          }
+        , instanceof: function (actual,expected,message){
+            if(!(actual instanceof expected))
+              assert.fail(actual,expected, message,'instanceof',arguments.callee)
+          }
+        , primitive: function (actual,message){
+            if('function' == typeof actual || 'object' == typeof actual) 
+              assert.fail(actual, 'must be number, string, boolean, or undefined'
+                , message,'primitive',arguments.callee)
+          }
+        , complex: function (actual,message){
+            if('function' !== typeof actual && 'object' !== typeof actual) 
+              assert.fail(actual,'must be object or function' 
+                , message,'complex',arguments.callee)
+          }
+        , function: function (actual,message){
+            if('function' !== typeof actual) 
+              assert.fail('function',actual 
+                , message,'should be a',arguments.callee)
+          }
+        , property: function (actual,property,value,message){
+            if(!actual[property] && value == null)
+            //checks that property is defined on actual, even if it is undefined (but not deleted)
+              assert.fail(actual , property
+                , message,'must have property',arguments.callee)
+            //if value is a function, assume it is an assertion... apply it to actual[property]
+            if('function' == typeof value)
+              value(actual[property])
+            else if (value != null) //else if value is exiting, check it's equal to actual[property]
+              exports.equal(actual[property],value, message) 
+              
+            //if you want to assert a value is null or undefined,
+            //use .property(name,it.equal(null|undefined))
+          }
+        , has: has
+        , every: every
+        , throws: throws
+        , matches : function (input,pattern,message) {
+            if(!pattern(input))
+              assert.fail(input, pattern
+              , (message || '')  + "RegExp " +
+              + pattern + ' didn\'t match \'' + input+ '\' ' , 'matches',arguments.callee)
+          //JSON doesn't write functions, (i.e. regexps,). make a custom message
+          }
+        , like: function (actual,expected,respect,message) {
+            respect = respect || {} 
+            var op = 'like({' +
+              [ respect.case ? 'case: true' : '' 
+              , respect.whitespace ? 'whitespace: true' : '' 
+              , respect.quotes ? 'quotes: true' : '' 
+              ].join() 
+              + '})'
+              
+            var a = '' + actual, e = '' + expected
+            
+            if(!respect.case) {
+              a = a.toLowerCase()
+              e = e.toLowerCase()
+            }
+            if(!respect.whitespace) {
+              a = a.replace(/\s/g,'')
+              e = e.replace(/\s/g,'')
+            }
+            if(!respect.quotes) {
+              a = a.replace(/\"|\'/g,'\"')
+              e = e.replace(/\"|\'/g,'\"')
+            }
+        
+            if(a != e)
+              assert.fail(a, e
+              , message , 'like',arguments.callee)
+          }
+        }
+        exports.__proto__ = assert
+        
+        //man, prototypal inheritence is WAY better than classical!
+        //if only it supported multiple inheritence. that would be awesome.
+        
+        function throws(tested,checker) {
+          try{
+            tested()
+          } catch (err){
+            if(checker)
+              checker(err)
+            return 
+          }
+          throw new assert.AssertionError ({message: "expected function" + tested + "to throw"})
+        }
+        
+        function every (array,func){
+          try{
+          assert.equal(typeof array,'object',"*is not an object*")
+          }catch(err){
+            err.every = array
+            err.index = -1
+            throw err
+          }
+          for(var i in array){
+            try {
+              func.call(null,array[i])
+            } catch (err) {
+              if(!(err instanceof Error) || !err.stack){
+                var n = new Error("non error type '" + err + "' thrown as error.")
+                n.thrownValue = err
+                err = n
+              }
+        //      err.stack = //bad way. stack is a getter.
+        //        "it/asserters.every intercepted error at item[" + render(i) + "]\n" + err.stack
+              err.every = array
+              err.index = i
+              throw err
+            }
+          }
+        }
+        
+        function has(obj,props) {
+          var pathTo = []
+          
+          //traverser has lots og functions, so it needs a longer stack trace.
+          var orig = Error.stackTraceLimit 
+          Error.stackTraceLimit = orig + 20
+        
+          try{
+            assert.ok(obj,"it has no properties!")
+            assert.ok(props)
+        
+            traverser(props,{leaf:leaf, branch: branch})
+          } catch (err){
+              if(!(err instanceof Error) || !err.stack) {
+                var n = new Error("non error type '" + err + "' thrown as error.")
+                n.thrownValue = err
+                err = n
+              }
+              err.stack = 
+                "it/asserters.has intercepted error at path: " 
+                  + renderPath(pathTo) + "\n" + err.stack
+              err.props = props
+              err.object = obj
+              err.path = pathTo
+              Error.stackTraceLimit = orig
+        
+              throw err
+          }
+          function leaf(p){
+            pathTo = p.path
+            var other = path(obj,p.path)
+            if('function' == typeof p.value){
+              p.value.call(p.value.parent,other)
+            } 
+            else {
+            //since this is the leaf function, it cannot be an object.
+            assert.equal(other,p.value)
+            }
+          }
+          function branch (p){
+            pathTo = p.path
+        
+            var other = path(obj,p.path)
+            if('function' !== typeof p.value)
+              exports.complex(other, other + " should be a type which can have properties, " + render(p.value)) //,typeof p.value)
+            p.each()
+          }
+        }
+        
+        function path(obj,path,message){
+          var object = obj
+          for(i in path){
+            var key = path[i]
+            obj = obj[path[i]]
+            if(obj === undefined) 
+              assert.fail("expected " + render(object),renderPath(path),message,"hasPath",arguments.callee)
+        //      assert.fail(obj,path,message,'hasPath',path)
+        //      throw new Error ("object " + render (obj) + "did not have path:" + render(path))
+          }
+          return obj
+        }
+        
+        function renderPath(path){
+          return path.map(function (e){
+            if(!isNaN(e))
+              return '[' + e + ']'
+            if(/^\w+$/(e))
+              return '.' + e
+            return '[' + JSON.stringify(e) + ']' 
+          }).join('')
+        }
+      },
+      resolves: {
+        assert: "/home/dominic/dev/core/assert.js",
+        traverser: "/home/dominic/npm/.npm/traverser/0.0.1/package/index.js",
+        render: "/home/dominic/npm/.npm/render/0.0.2/package/render.js"
+      }
+    },
+    '/home/dominic/npm/.npm/it-is/0.0.1/package/test/assert.expresso.js': {
+      closure: function (require,module,exports,__filename,__dirname){
+        //asserters.expresso.js
+        
+        var asserters = require('it-is/assert')
+          , assert = require('assert')
+        
+        var deleted_a = {a: true}
+        delete deleted_a.a
+        
+        var a,b,c,d,e
+        var examples =
+        { ok : {
+            pass : [[1], [2], [-1], ['sadf'], [true], [[]], [{}]]
+          , fail : [[0],[false],[null],[undefined]]
+          }
+          
+        , equal : {
+            pass : [ [1,1], [2,2.0], [-1,-1], ['sadf','sadf'], [true,1]
+                   , [a = [], a], [b = {}, b]]
+          , fail : [ [0,1], [[],[]] ]
+          }
+          
+        , typeof : {
+            pass : [ [1, 'number']
+                   , [NaN, 'number']
+                   , ['', 'string']
+                   , [{}, 'object']
+                   , [null,'object']
+                   , [undefined, 'undefined'] ]
+          , fail : [ [0, 'string'] ]
+          }
+          
+        , instanceof : {
+            pass : [ [{}, Object], [[], Object], [[], Array]
+                   , [new Error, Error], [function (){}, Function]]
+          , fail : [ [{}, Array] ]
+          }
+        , has : {// has basicially checks if expected is a sub tree of actual.
+            pass : [ [{a: 1}, {a: 1}]
+                   , [{a: 1, b: 2}, {a: 1}]
+                   , [{a: 1}, {a: assert.ok}]  //also, it applies functions in expected 
+                   ]
+          , fail : [ [{a: 1}, {a: 1, b: 2}]
+                   , [{a: 1}, {a: {}}] 
+                   , [{}, {a: {}}] 
+                   , [{a: false}, {a: assert.ok}] 
+                   ]
+          }
+        , every : { 
+            pass : [ [[1,2,3,4,5],assert.ok] ]
+          , fail : [ [[1,2,3,4,5,false],assert.ok] ]
+          }
+        
+        , primitive : {
+            pass : [ [1], [2], [3], ['sadgsdf'] [true], [false], [undefined] ]
+          , fail : [ [null], [[]], [{}], [new Error], [function (){}] ]
+          }
+        
+        , complex : {
+            pass : [ [null], [[]], [{}], [new Error], [function (){}] ]
+          , fail : [ [1], [2], [3], ['sadgsdf'] [true], [false], [undefined] ]
+          }
+        , function : {
+            pass : [ [function(){}], [/asdf/], [Error], [({}).constructor] ]
+          , fail : [ [1], [2], [3], ['sadgsdf'] [true], [false], [undefined] ]
+          }
+        , matches : {
+            pass : [ ['hello', /\w+/] , ['asdgsadg', /[a|s|d|g]+/] ]
+          , fail : [ ['sgfg-', /^\w+$/] ]
+          }
+        //like (actual,expected,{case:boolean,whitespace:boolean,quotes:boolean}) //all default to on.
+        
+        , like : {
+            pass : 
+            [ ['hello\n', 'hello'] 
+            , ['asdgsadg', 'ASDGSADG']
+            , ['"quoted"', "'quoted'"]
+            , ['1234', '1\n2\n3\n4\n']
+            ]
+          , fail : 
+            [ ['hello\n', 'hello', {whitespace: true}] 
+            , ['asdgsadg', 'ASDGSADG', {case: true}]
+            , ['"quoted"', "'quoted'", {quotes: true}]
+            ]
+          }
+        , property : {
+            pass : [ [{a:true}, 'a'], [[],'length',0], ['hello','length', 5], [{a:1}, 'a', assert.ok ], [{a:null}, 'a', function (actual){assert.equal(actual,null)} ] ]
+          , fail : [ [{}, 'a'], [deleted_a, 'a'], [{a:undefined}, 'a'], ['hello','length', 7] ,[{a:false}, 'a', assert.ok]]
+          }
+        }
+        
+        exports ['check examples'] = function (){
+        //  check('ok')
+          for(i in examples){
+        //    console.log(i)
+        //    console.log(examples[i])
+            check(i)
+          }
+        }
+        
+        function check(name){
+          //check passes
+          examples[name].pass.forEach(function (e,k){
+            console.log(name + '(' + e.join() + ')')
+            asserters[name].apply(null,e)
+          })
+          //check fails
+          examples[name].fail.forEach(function (e){
+            console.log(name + '(' + e.join() + ') -> fail')
+            try {
+              asserters[name].apply(null,e)
+              console.log('SHOULD HAVE FAILED')
+            } catch (err){
+              if(!(err instanceof assert.AssertionError)){
+                console.log('should be assertion error')
+                  throw err
+                }
+              return
+            }
+            assert.ok(false,"expected " + name + "(" + e.join() + ") to fail")
+          })
+        }
+          
+        exports ['every'] = function (){
+          asserters.every([1,2,3,4,5,6],function (x){
+            assert.ok('number' == typeof x)
+          })
+          assert.throws(function(){  
+            asserters.every([1,2,'asda',4,5,6],function (x){
+              assert.ok('number' == typeof x)
+            })
+          })
+        }
+        
+        
+        exports ['throws can check what object is thrown'] = function (){
+        
+          var examples = 
+          [ [ 'throws', 
+              [ function () {throw "HELLO"}
+              , function (thrown) { assert.equal(thrown,"HELLO") } ] ]
+          , [ 'throws', 
+              [ function () {throw "HELLO"} ] ]
+          ]
+          examples.forEach(function (c){
+            asserters[c[0]].apply(null,c[1])
+          })
+        }
+        
+        
+        exports ['every intercepts error, records item errored at'] = function (){
+          var examples = 
+          [ [ [1,2,3,4,5,null], assert.ok, 5] 
+          , [ [null,'sadf','sadfg'], assert.ok, 0] 
+          , [ [null,null,null,1], assert.ifError, 3]
+          ]
+          //  asserters.every([null,null,null,1], assert.ifError)
+            
+          examples.forEach(function (e){
+            try {  
+              asserters.every(e[0],e[1])
+            } catch (err) {
+              assert.equal(err.index,e[2])
+            }
+          })
+        }
+        
+        exports ['has intercepts error, records path item errored at'] = function (){
+        
+          var examples = 
+          [ [ {a: null}, {a: assert.ok}, ['a']] 
+          , [ {'a-b-c': {0: {x: false } } }, {'a-b-c': {0 : {x:assert.ok}}}, ['a-b-c',0,'x']] 
+          , [ {a:{}},{a:{b: 1}}, ['a','b']]
+          ]
+        
+        //  asserters.has()
+            
+          examples.forEach(function (e){
+            try {  
+              asserters.has(e[0],e[1])
+            } catch (err) {
+              return assert.deepEqual(err.path,e[2])
+            }
+            assert.ok(false,"expected has to throw error at path " + inspect(e[2]))
+          })
+        
+        }
+      },
+      resolves: {
+        'it-is/assert': "/home/dominic/npm/.npm/it-is/0.0.1/package/assert.js",
+        assert: "/home/dominic/dev/core/assert.js"
+      }
     }
   },
-  main: "/home/dominic/dev/core/assert.js",
-  request: "assert",
+  main: "/home/dominic/npm/.npm/it-is/0.0.1/package/test/assert.expresso.js",
+  request: "it-is/test/assert.expresso",
   paths: [
     "/home/dominic/npm",
     "/home/dominic/dev",
