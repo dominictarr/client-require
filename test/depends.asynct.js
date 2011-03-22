@@ -69,8 +69,6 @@ exports ['discover dependencies c'] = function (test){
       , filename: files.c }
     ])
 
-    console.log(a)
-
     test.done()
   })
 }
@@ -97,7 +95,7 @@ exports ['discover dependencies from path'] = function (test){
       , filename: files.c }
     ])
 
-    console.log(c_path)
+//    console.log(c_path)
 
     test.done()
   })

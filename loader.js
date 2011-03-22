@@ -5,6 +5,7 @@ exports.load = function (request,relative){
     , loaded;
 
   //hack to get load a module relative to a specific place.
+    module.filename = relative
 
     try{
       loaded = require(request)

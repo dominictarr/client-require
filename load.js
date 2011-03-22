@@ -1,12 +1,21 @@
 if(!module.parent){
 
-  process.argv.shift()
-  process.argv.shift()
+console.log(process.argv[2])
 
-  var relative = process.argv.shift() + '/RELATIVE_FILE.js'
-    , request = process.argv
+//  process.argv.shift()
+  //process.argv.shift()
+
+  var opts = JSON.parse(process.argv[2])
+    , relative = opts.relative + '/RELATIVE_FILE.js'
+  //  , request = process.argv
     , depends = require('meta-test/depends')
+    , fs = require('fs')
     , loader = require('./loader')
+
+  console.log(opts)
+
+  if(!/^\/tmp\/.*/(opts.file))
+    throw new Error("expects a tmp file as last argument, not:" + opts.file)
 
   depends.remap({
     assert: 'core/assert', 
@@ -18,19 +27,24 @@ if(!module.parent){
     events: 'core/events'})
 
   try{
-    process.argv.map(function (e){return loader.load(e,relative)})//(request)
+    opts.requests.forEach(function (e){return loader.load(e,relative)})//(request)
   }catch (err){
-//    console.log('/*error loading files*/')
-    return console.log(JSON.stringify({error: err}))    
+
+  fs.writeFileSync(opts.file,JSON.stringify({error: err}))
+  return
   }
   
   var loaded
    loaded = depends.sorted(__dirname + '/loader.js')
   var main = loaded.pop()
 
-  process.on('exit', function (){
-  //  console.log('/*last line will be valid json*/')
-    console.log(JSON.stringify({
+  //logging to console is bad. noisy channel. 
+  
+  //write to a file.
+
+  //don't do it at on process exit, it will get cut off.
+  
+  fs.writeFile(opts.file,JSON.stringify({
       success: {
         modules: 
         loaded.map(function (e){
@@ -40,11 +54,15 @@ if(!module.parent){
           , source: e.source
           }
         })
-    , main: main.resolves[request[0]]
+    , main: main.resolves[opts.requests[0]]
     , resolves: main.resolves
-    , request: request
+    , request: opts.requests
     , paths: require.paths
-    }}))
-  })
+    }}),'utf-8', function(){
+    
+    })
+
+//  })
+
 }
 

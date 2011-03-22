@@ -20,28 +20,17 @@ function depends(requests, relative, cb){
   if(!Array.isArray(requests))
     requests = [requests]
     
-/*  requests = requests.map(function (request){
-    return request[0] == '.'  
-      ? request
-      : request
-  }).join(' ')*/
-
-//  var json = ''
+  var file = '/tmp/client-require-' + (Math.round(Math.random()*100000))
   var cmd = 
         [ //run child node with same version as this process.
           join(__dirname,'./load.js')
-        , relative].concat(requests)
+        , "'" +JSON.stringify({file: file, relative: relative, requests: requests})+"'"]
 
-  console.log
-  exec(process.execPath+ ' ' + cmd.join(' '), function (err,stdout,stderr){
+  exec(process.execPath + ' ' + cmd.join(' '), function (err,stdout,stderr){
     var obj = {}
-//      , json = stdout.split('\n')
+    if(err) throw err
 
-  //    json.pop() // blank 
-    //  json = json.pop()
-    json = stdout
-    console.log(stdout)
-    console.log(err)
+    json = require('fs').readFileSync(file)
 
     try {obj = JSON.parse(json)} catch(err) {obj.error = err}
 
@@ -139,7 +128,6 @@ function host (options){
         , function (err,src){
 
       if(err) throw err
-      console.log(src)
       res.writeHead(200, {
 //        'Last-Modified' : modified.toString(),
         'Content-Type' : 'text/javascript'
