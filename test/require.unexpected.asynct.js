@@ -1,4 +1,4 @@
-var bnr = require('bnr')
+var bnr = require('client-require')
   , it = require('it-is')
   , files = {
       a:__dirname + '/examples/a.js'
@@ -32,7 +32,7 @@ exports ['load path file not in resolves list'] = function (test){
     var main = b_require()
     
     it(main.c.c()).like("only cc's be tasting like these")
-    var a = main.load('bnr/test/examples/a')
+    var a = main.load('client-require/test/examples/a')
     it(a).ok()
     
     test.done()

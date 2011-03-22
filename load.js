@@ -1,7 +1,12 @@
 if(!module.parent){
 
-  var request = process.argv[2]
+  process.argv.shift()
+  process.argv.shift()
+
+  var relative = process.argv.shift() + '/RELATIVE_FILE.js'
+    , request = process.argv
     , depends = require('meta-test/depends')
+    , loader = require('./loader')
 
   depends.remap({
     assert: 'core/assert', 
@@ -11,10 +16,11 @@ if(!module.parent){
     child_process: 'core/child_process', 
     util: 'core/util', 
     events: 'core/events'})
-    
+
   try{
-    require('./loader').load(request)
+    process.argv.map(function (e){return loader.load(e,relative)})//(request)
   }catch (err){
+//    console.log('/*error loading files*/')
     return console.log(JSON.stringify({error: err}))    
   }
   
@@ -22,9 +28,11 @@ if(!module.parent){
    loaded = depends.sorted(__dirname + '/loader.js')
   var main = loaded.pop()
 
-  console.log(JSON.stringify({
-    success: {
-      modules: 
+  process.on('exit', function (){
+  //  console.log('/*last line will be valid json*/')
+    console.log(JSON.stringify({
+      success: {
+        modules: 
         loaded.map(function (e){
           return {
             filename: e.filename
@@ -32,9 +40,11 @@ if(!module.parent){
           , source: e.source
           }
         })
-    , main: main.resolves[request]
+    , main: main.resolves[request[0]]
+    , resolves: main.resolves
     , request: request
     , paths: require.paths
-    }
-  }))
+    }}))
+  })
 }
+

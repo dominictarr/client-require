@@ -1,0 +1,21 @@
+{
+  "name": "client-require",
+  "description": "replicates require() for the client-side",
+  "version": "0.0.0",
+  "homepage": "https://github.com/dominictarr/client-require",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dominictarr/client-require.git"
+  },
+  "author": "Dominic Tarr <dominic.tarr@gmail.com> (http://bit.ly/dominictarr)",
+  "main": "./index.js",
+  "directories": {
+    "lib": "."
+  },
+  "scripts": {
+    "test": "meta-test test/*.js"
+  },
+  "engines": {
+    "node": ">=0.2.0"
+  }
+}

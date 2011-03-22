@@ -3,7 +3,7 @@ how does this load into the browser?
 
 wrapped inside a function ()?
 
-bnr('/pathto/main/module')
+client-require('/pathto/main/module')
 
 ... which returns exports... will be nice to test...
 
@@ -17,8 +17,8 @@ bnr(rel,path,function(err,src){
 
 */
 
-var depends = require('bnr').depends
-  , scripts = require('bnr').scripts
+var depends = require('client-require').depends
+  , scripts = require('client-require').scripts
   , it = require('it-is')
   , files = {
       a:__dirname + '/examples/a.js'

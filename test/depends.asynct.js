@@ -13,8 +13,8 @@ module: function (require,module,exports,__filename,__dirname){
   //code...
 }
 */
-var depends = require('bnr').depends
-  , scripts = require('bnr').scripts
+var depends = require('client-require').depends
+  , scripts = require('client-require').scripts
   , it = require('it-is')
 
 
@@ -77,7 +77,7 @@ exports ['discover dependencies c'] = function (test){
 
 exports ['discover dependencies from path'] = function (test){
 
-  depends('bnr/test/examples/c',__dirname,function (err,c_path){
+  depends('client-require/test/examples/c',__dirname,function (err,c_path){
     it(err).equal(null)
     
     //files will be returned in topological sort order.
@@ -106,7 +106,8 @@ exports ['discover dependencies from path'] = function (test){
 
 exports ['error on module not found'] = function (test){
 
-  depends('bnr/test/dslfvnsdlkfds',__dirname,function (err){
+  depends('client-require/test/dslfvnsdlkfds',__dirname,function (err,data){
+    it(data).equal(null)
     it(err).property('message',it.matches(/Cannot find module/))
        
     test.done()

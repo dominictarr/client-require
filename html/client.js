@@ -645,6 +645,7 @@ b_require = Header({
           ctor.prototype = Object.create(superCtor.prototype, {
             constructor: { value: ctor, enumerable: false }
           });
+          
         };
       },
       resolves: {
@@ -1530,11 +1531,11 @@ b_require = Header({
           , render = require('render')
         
         exports = module.exports = {
-          typeof: function (actual,expected,message){
+          "typeof": function (actual,expected,message){
             if(expected !== typeof actual)
               assert.fail(actual, expected, (actual + ' typeof ' + expected),'typeof',arguments.callee)
           }
-        , instanceof: function (actual,expected,message){
+        , "instanceof": function (actual,expected,message){
             if(!(actual instanceof expected))
               assert.fail(actual,expected, message,'instanceof',arguments.callee)
           }
@@ -1548,7 +1549,7 @@ b_require = Header({
               assert.fail(actual,'must be object or function' 
                 , message,'complex',arguments.callee)
           }
-        , function: function (actual,message){
+        , "function": function (actual,message){
             if('function' !== typeof actual) 
               assert.fail('function',actual 
                 , message,'should be a',arguments.callee)
@@ -1580,7 +1581,7 @@ b_require = Header({
         , like: function (actual,expected,respect,message) {
             respect = respect || {} 
             var op = 'like({' +
-              [ respect.case ? 'case: true' : '' 
+              [ respect['case'] ? 'case: true' : '' 
               , respect.whitespace ? 'whitespace: true' : '' 
               , respect.quotes ? 'quotes: true' : '' 
               ].join() 
@@ -1588,7 +1589,7 @@ b_require = Header({
               
             var a = '' + actual, e = '' + expected
             
-            if(!respect.case) {
+            if(!respect['case']) {
               a = a.toLowerCase()
               e = e.toLowerCase()
             }
@@ -1901,7 +1902,7 @@ b_require = Header({
           ok: function (error,style){
             return style.render(style.red(error.actual),'',style.red('ok'))
           }
-        , instanceof: function (error,style){
+        , "instanceof": function (error,style){
             return style.render 
               ( style.red (style.stringify(error.actual))
               , style.green (error.expected.name)
@@ -1916,7 +1917,7 @@ b_require = Header({
             var m = stringEq(error.actual,error.expected,style)
             return style.render("'" + m[0] + "'","'" +m[1] + "'",style.red('equal'))
           }
-          return this.default(error,style,name)
+          return this['default'](error,style,name)
         }
         , every : function (error,style){
             var m = [] //error.every instanceof Array ? [] : {}
@@ -1982,7 +1983,7 @@ b_require = Header({
               , style.red('has') )
             //render has, and it but replace the error causing item in has with the error message.
           }
-        , default: function (error,style,name){
+        , "default": function (error,style,name){
             return style.render
               ( style.red (style.stringify(error.actual))
               , style.green (style.stringify(error.expected))

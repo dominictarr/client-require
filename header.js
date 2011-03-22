@@ -47,8 +47,10 @@ exports.Header = function Header (req,rel){
     return to.join('/') + '/' + req.join('/')
   }
   function resolve (req,parent) {
-    if(!parent) {
+    if(!req)
       return __manifest__.main
+    if(!parent) {
+      return __manifest__.resolves[req]
     } else {
       return __payload__[parent.filename].resolves[req] || (function (){
         if ('.' === req[0]) 
@@ -74,7 +76,7 @@ exports.Header = function Header (req,rel){
       throw new Error('could not load:\'' + req +"' (" + fn + ") expected one of:" 
         + JSON.stringify(Object.keys(modules)) 
         + '\nrequested by:' 
-        + JSON.stringify(__payload__[parent.filename].resolves))
+        + (parent ? JSON.stringify(__payload__[parent.filename].resolves) : 'main' ))
     }
     var func = modules[fn].closure
     var m  = new Module(fn,parent)

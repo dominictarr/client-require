@@ -2,37 +2,56 @@
 exports = module.exports = bnr
 exports.depends = depends
 exports.scripts = renderScript
+exports.host = host
 
-var exec = require('child_process').exec
+var spawn = require('child_process').spawn
+  , exec = require('child_process').exec
   , join = require('path').join
   , fs = require('fs')
   , render = require('render')
   , header = require('./header')
+  , qs = require('qs')
 
 function indent(str){
   return ('' + str).trim().split('\n').map(function (e){return '  ' + e}).join('\n')
 }
 
-function depends(request, relative, cb){
-  var json = ''
-  var cmd = 
-        [ 'node'
-        , join(__dirname,'./load.js')
-        , request[0] == '.'  
-          ? join(relative,request) 
-          : request
-        ].join(' ')
+function depends(requests, relative, cb){
+  if(!Array.isArray(requests))
+    requests = [requests]
+    
+/*  requests = requests.map(function (request){
+    return request[0] == '.'  
+      ? request
+      : request
+  }).join(' ')*/
 
-  exec(cmd,function (err,stdout,stderr){
+//  var json = ''
+  var cmd = 
+        [ //run child node with same version as this process.
+          join(__dirname,'./load.js')
+        , relative].concat(requests)
+
+  console.log
+  exec(process.execPath+ ' ' + cmd.join(' '), function (err,stdout,stderr){
     var obj = {}
-    try {obj = JSON.parse(stdout)} catch(err) {obj.error = err}
+//      , json = stdout.split('\n')
+
+  //    json.pop() // blank 
+    //  json = json.pop()
+    json = stdout
+    console.log(stdout)
+    console.log(err)
+
+    try {obj = JSON.parse(json)} catch(err) {obj.error = err}
+
     cb(err || obj.error,obj.success)
   })
 }
 
 function wrap(code,done){
   return eval('(function (require,module,exports,__filename,__dirname){\n'
-     + indent(code)
+     + indent(code.replace(/^#/,'//#'))
      + "\n});")
 }
 
@@ -105,8 +124,27 @@ function bnr (request, relative, cb) {
         cb(err
           , header.getHeaderScript()
           + '\n'
-          + prepare(load))
-
+          + (load ? prepare(load) : null))
   })
 }
 
+function host (options){
+  return function (req, res, next) {
+    var query = qs.parse(req.url.split('?')[1]) || {}
+      , require = query.require 
+      ? query.require.split(',') 
+      : options["default"]
+      
+    bnr(require, options.relative
+        , function (err,src){
+
+      if(err) throw err
+      console.log(src)
+      res.writeHead(200, {
+//        'Last-Modified' : modified.toString(),
+        'Content-Type' : 'text/javascript'
+      })
+      res.end(src);
+   })
+  }
+}

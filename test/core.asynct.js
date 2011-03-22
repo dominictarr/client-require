@@ -1,4 +1,4 @@
-var bnr = require('bnr')
+var bnr = require('client-require')
   , it = require('it-is')
   , assert = require('assert')
   
